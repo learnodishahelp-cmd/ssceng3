@@ -1,0 +1,1506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSC Word Power Quiz</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
+    <style>
+        :root {
+            --primary: #5b5fe3;
+            --primary-dark: #4a4ec9;
+            --secondary: #8b5cf6;
+            --success: #10b981;
+            --success-light: #d1fae5;
+            --danger: #ef4444;
+            --danger-light: #fee2e2;
+            --warning: #f59e0b;
+            --warning-light: #fef3c7;
+            --info: #3b82f6;
+            --info-light: #eff6ff;
+            --card: #ffffff;
+            --text: #1e293b;
+            --text-light: #64748b;
+            --text-muted: #94a3b8;
+            --border: #e2e8f0;
+            --shadow-lg: 0 12px 32px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06);
+            --radius-sm: 10px;
+            --radius: 16px;
+            --radius-lg: 20px;
+            --radius-xl: 24px;
+            --transition: 0.25s cubic-bezier(0.4,0,0.2,1);
+            --font: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { font-size: 16px; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            font-family: var(--font);
+            background: linear-gradient(135deg, #e8ecf4 0%, #dce3f0 25%, #eef1f8 50%, #e4e9f5 75%, #f0f4f8 100%);
+            background-attachment: fixed;
+            min-height: 100vh; min-height: 100dvh;
+            display: flex; align-items: center; justify-content: center;
+            padding: 16px; color: var(--text);
+            -webkit-font-smoothing: antialiased;
+            position: relative; overflow-x: hidden;
+        }
+
+        body::before, body::after {
+            content: ''; position: fixed; border-radius: 50%;
+            filter: blur(80px); opacity: 0.35; pointer-events: none;
+            z-index: 0; animation: floatOrb 20s ease-in-out infinite;
+        }
+        body::before { width: 350px; height: 350px; background: #c4b5fd; top: -80px; left: -100px; }
+        body::after  { width: 300px; height: 300px; background: #a5d8ff; bottom: -90px; right: -80px; animation-delay: -10s; }
+
+        @keyframes floatOrb {
+            0%,100% { transform: translate(0,0) scale(1); }
+            25%     { transform: translate(30px,-40px) scale(1.1); }
+            50%     { transform: translate(-20px,25px) scale(0.9); }
+            75%     { transform: translate(-35px,-20px) scale(1.05); }
+        }
+
+        .app-container {
+            position: relative; z-index: 1;
+            width: 100%; max-width: 560px;
+            background: var(--card); border-radius: var(--radius-xl);
+            box-shadow: var(--shadow-lg); overflow: hidden;
+            min-height: 520px; display: flex; flex-direction: column;
+        }
+
+        .screen {
+            display: none; flex-direction: column; flex: 1;
+            padding: 28px 24px 24px;
+            animation: fadeSlideIn 0.4s ease-out;
+        }
+        .screen.active { display: flex; }
+
+        @keyframes fadeSlideIn {
+            from { opacity: 0; transform: translateY(18px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ===== BUTTONS ===== */
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            gap: 8px; padding: 14px 32px; border-radius: 50px;
+            font-size: 1rem; font-weight: 600; cursor: pointer; border: none;
+            transition: all var(--transition); font-family: var(--font);
+            letter-spacing: 0.01em; white-space: nowrap;
+            user-select: none; -webkit-user-select: none;
+        }
+        .btn:active { transform: scale(0.96); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: #fff; box-shadow: 0 4px 15px rgba(91,95,227,0.35);
+            font-size: 1.05rem; padding: 15px 40px;
+        }
+        .btn-primary:hover { box-shadow: 0 6px 22px rgba(91,95,227,0.45); transform: translateY(-2px); }
+        .btn-outline { background: #fff; color: var(--primary); border: 2px solid var(--primary); }
+        .btn-outline:hover { background: #f5f3ff; }
+        .btn-sm { padding: 10px 20px; font-size: 0.88rem; }
+        .btn-success { background: var(--success); color: #fff; }
+        .btn-info { background: var(--info); color: #fff; box-shadow: 0 4px 14px rgba(59,130,246,0.3); }
+        .btn-info:hover { box-shadow: 0 6px 20px rgba(59,130,246,0.4); transform: translateY(-2px); }
+
+        /* ===== START SCREEN (guest + returning) ===== */
+        .start-screen {
+            align-items: center; justify-content: center;
+            text-align: center; gap: 20px; padding: 40px 28px;
+        }
+        .guest-content, .returning-content { display: flex; flex-direction: column; align-items: center; gap: 20px; width: 100%; }
+        .guest-content { display: flex; } /* default for new user */
+        .returning-content { display: none; }
+
+        .logo-icon { font-size: 64px; animation: bounce 2s ease-in-out infinite; }
+        @keyframes bounce {
+            0%,100% { transform: translateY(0); }
+            40%     { transform: translateY(-18px); }
+            60%     { transform: translateY(-6px); }
+        }
+        .start-screen h1 {
+            font-size: 1.9rem; font-weight: 700;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text; line-height: 1.2;
+        }
+        .start-screen .subtitle { font-size: 0.95rem; color: var(--text-light); max-width: 340px; line-height: 1.5; }
+
+        .welcome-msg {
+            font-size: 1.3rem; font-weight: 700;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .info-cards { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; width: 100%; max-width: 380px; }
+        .info-card {
+            flex: 1; min-width: 90px; background: #f8fafc; border: 1px solid var(--border);
+            border-radius: var(--radius-sm); padding: 14px 12px; text-align: center;
+        }
+        .info-card .icon  { font-size: 26px; margin-bottom: 4px; }
+        .info-card .label { font-size: 0.78rem; color: var(--text-light); font-weight: 500; }
+        .info-card .value { font-size: 1.1rem; font-weight: 700; color: var(--text); }
+
+        .history-box {
+            width: 100%; max-width: 400px;
+            background: #f8fafc; border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 16px;
+            text-align: left;
+        }
+        .history-box h4 { margin: 0 0 10px; font-size: 0.95rem; color: var(--text); }
+        .history-list { display: flex; flex-direction: column; gap: 8px; max-height: 180px; overflow-y: auto; }
+        .history-item {
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 0.82rem; padding: 8px 12px;
+            background: #fff; border-radius: 8px; border: 1px solid var(--border);
+        }
+        .history-score { font-weight: 700; color: var(--primary); }
+        .history-date { color: var(--text-muted); font-size: 0.75rem; }
+        .change-user-btn {
+            background: none; border: none; color: var(--danger); font-size: 0.8rem;
+            cursor: pointer; text-decoration: underline; margin-top: 8px;
+        }
+
+        /* ===== NAME ENTRY SCREEN ===== */
+        .name-screen {
+            align-items: center; justify-content: center;
+            text-align: center; gap: 24px; padding: 40px 28px;
+        }
+        .name-screen .name-icon { font-size: 56px; }
+        .name-screen h2 {
+            font-size: 1.6rem; font-weight: 700;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .name-screen p { font-size: 0.9rem; color: var(--text-light); max-width: 300px; line-height: 1.5; }
+        .name-field-wrap { width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 12px; }
+        .name-field, .mobile-field {
+            width: 100%; padding: 14px 20px; border-radius: 50px;
+            border: 2px solid var(--border); font-size: 1rem;
+            font-family: var(--font); outline: none;
+            transition: all var(--transition); background: #fafbfc;
+            text-align: center; color: var(--text);
+        }
+        .name-field:focus, .mobile-field:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(91,95,227,0.12);
+            background: #fff;
+        }
+        .name-field::placeholder, .mobile-field::placeholder { color: var(--text-muted); }
+        .name-error, .mobile-error {
+            font-size: 0.82rem; color: var(--danger); font-weight: 500;
+            min-height: 18px; text-align: center;
+        }
+
+        /* ===== QUIZ SCREEN ===== */
+        .quiz-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 12px; }
+        .question-counter {
+            font-weight: 700; font-size: 0.9rem; color: var(--primary);
+            background: #eef0ff; padding: 6px 14px; border-radius: 50px; white-space: nowrap;
+        }
+        .player-badge {
+            font-weight: 600; font-size: 0.82rem; color: var(--text-light);
+            background: #f8fafc; border: 1px solid var(--border);
+            padding: 5px 12px; border-radius: 50px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;
+        }
+        .timer-display {
+            font-weight: 700; font-size: 0.9rem; color: var(--text);
+            background: #f8fafc; padding: 6px 14px; border-radius: 50px;
+            display: flex; align-items: center; gap: 6px; white-space: nowrap; transition: color 0.3s;
+        }
+        .timer-display.urgent  { color: var(--danger); animation: pulse 0.6s ease-in-out infinite; }
+        .timer-display.warning { color: var(--warning); }
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+        .timer-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; transition: background 0.3s; }
+
+        .timer-bar-container { width: 100%; height: 6px; background: #e5e7eb; border-radius: 10px; margin-bottom: 20px; overflow: hidden; }
+        .timer-bar { height: 100%; border-radius: 10px; background: var(--success); transition: width 0.1s linear, background 0.4s; width: 100%; }
+        .timer-bar.warning { background: var(--warning); }
+        .timer-bar.danger  { background: var(--danger); }
+
+        .progress-dots { display: flex; gap: 3px; flex-wrap: wrap; margin-bottom: 18px; justify-content: center; }
+        .progress-dot { width: 8px; height: 8px; border-radius: 50%; background: #e5e7eb; transition: all var(--transition); flex-shrink: 0; }
+        .progress-dot.done      { background: var(--success); transform: scale(1.2); }
+        .progress-dot.wrong-dot { background: var(--danger); transform: scale(1.2); }
+        .progress-dot.skipped   { background: var(--text-muted); transform: scale(1.2); }
+        .progress-dot.current   { background: var(--primary); box-shadow: 0 0 0 4px rgba(91,95,227,0.2); transform: scale(1.4); animation: dotPulse 1.5s ease-in-out infinite; }
+        @keyframes dotPulse {
+            0%,100% { box-shadow: 0 0 0 4px rgba(91,95,227,0.2); }
+            50%     { box-shadow: 0 0 0 10px rgba(91,95,227,0); }
+        }
+
+        .question-text {
+            font-size: 1.1rem; font-weight: 600; line-height: 1.55; color: var(--text);
+            margin-bottom: 20px; padding: 16px 18px;
+            background: #fafbfc; border-radius: var(--radius);
+            border-left: 4px solid var(--primary); letter-spacing: 0.01em;
+            min-height: 60px; display: flex; align-items: center;
+        }
+
+        .options-list { display: flex; flex-direction: column; gap: 10px; list-style: none; }
+        .option-btn {
+            display: flex; align-items: center; gap: 12px; width: 100%;
+            padding: 14px 16px; border: 2px solid var(--border);
+            border-radius: var(--radius); background: #fff;
+            cursor: pointer; font-size: 0.95rem; font-family: var(--font);
+            text-align: left; transition: all var(--transition);
+            font-weight: 500; color: var(--text);
+            user-select: none; -webkit-user-select: none;
+        }
+        .option-btn:hover { border-color: #c4c8f0; background: #fafaff; transform: translateX(2px); }
+        .option-btn:active { transform: scale(0.985); }
+        .option-letter {
+            display: flex; align-items: center; justify-content: center;
+            width: 36px; height: 36px; border-radius: 50%; background: #f1f5f9;
+            font-weight: 700; font-size: 0.9rem; flex-shrink: 0; transition: all var(--transition); color: var(--text-light);
+        }
+        .option-btn:hover .option-letter { background: #e0e4f5; color: var(--primary); }
+        .option-btn.correct { border-color: var(--success) !important; background: var(--success-light) !important; animation: correctPop 0.5s ease-out; }
+        .option-btn.correct .option-letter { background: var(--success); color: #fff; }
+        .option-btn.wrong   { border-color: var(--danger)  !important; background: var(--danger-light)  !important; animation: shake 0.5s ease-out; }
+        .option-btn.wrong .option-letter { background: var(--danger); color: #fff; }
+        .option-btn.reveal-correct { border-color: var(--success) !important; background: #f0fdf6 !important; }
+        .option-btn.reveal-correct .option-letter { background: var(--success); color: #fff; }
+        .option-btn.disabled { pointer-events: none; opacity: 0.7; }
+        .option-btn.disabled:hover { transform: none; border-color: var(--border); background: #fff; }
+        @keyframes correctPop { 0%{transform:scale(1);} 30%{transform:scale(1.03);} 100%{transform:scale(1);} }
+        @keyframes shake { 0%,100%{transform:translateX(0);} 20%{transform:translateX(-6px);} 40%{transform:translateX(6px);} 60%{transform:translateX(-4px);} 80%{transform:translateX(4px);} }
+
+        /* ===== RESULT SCREEN ===== */
+        .result-screen { align-items: center; text-align: center; gap: 14px; padding: 28px 24px 20px; }
+        .result-emoji { font-size: 56px; animation: bounce 1.5s ease-in-out; }
+        .result-player-name {
+            font-size: 1.1rem; font-weight: 700; color: var(--primary);
+            background: #eef0ff; padding: 6px 20px; border-radius: 50px;
+        }
+        .score-circle { position: relative; width: 130px; height: 130px; flex-shrink: 0; }
+        .score-circle svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+        .score-circle .bg-ring      { fill: none; stroke: #e5e7eb; stroke-width: 10; }
+        .score-circle .progress-ring { fill: none; stroke: var(--success); stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset 1.2s cubic-bezier(0.4,0,0.2,1); }
+        .score-circle .score-text { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 800; font-size: 2.2rem; color: var(--text); line-height: 1; }
+        .score-circle .score-text small { font-size: 0.72rem; font-weight: 500; color: var(--text-light); display: block; }
+        .result-message { font-size: 1rem; font-weight: 600; color: var(--text); max-width: 320px; }
+        .result-detail  { font-size: 0.83rem; color: var(--text-light); }
+
+        .auto-save-status {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 0.82rem; font-weight: 500; padding: 8px 16px;
+            border-radius: 50px; background: #f8fafc; border: 1px solid var(--border);
+        }
+        .auto-save-status.saving { color: var(--warning); border-color: #fcd34d; background: var(--warning-light); }
+        .auto-save-status.saved  { color: var(--success); border-color: #6ee7b7; background: var(--success-light); }
+        .auto-save-status.error  { color: var(--danger);  border-color: #fca5a5; background: var(--danger-light); }
+
+        .result-buttons { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; width: 100%; max-width: 380px; }
+
+        /* ===== REVIEW SCREEN ===== */
+        .review-screen { gap: 0; padding: 0; }
+        .review-header {
+            position: sticky; top: 0; z-index: 10;
+            background: var(--card); padding: 18px 20px 14px;
+            border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; gap: 12px;
+        }
+        .review-header h2 { font-size: 1.2rem; font-weight: 700; color: var(--text); flex: 1; }
+        .review-score-badge {
+            font-size: 0.82rem; font-weight: 700; padding: 5px 14px;
+            border-radius: 50px; background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: #fff; white-space: nowrap;
+        }
+        .review-list { flex: 1; overflow-y: auto; padding: 16px 20px 20px; display: flex; flex-direction: column; gap: 16px; }
+        .review-list::-webkit-scrollbar { width: 5px; }
+        .review-list::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
+
+        .review-card { border-radius: var(--radius); border: 2px solid var(--border); overflow: hidden; transition: all var(--transition); }
+        .review-card.correct-card { border-color: var(--success); }
+        .review-card.wrong-card   { border-color: var(--danger); }
+        .review-card.skipped-card { border-color: var(--text-muted); }
+        .review-card-header {
+            display: flex; align-items: flex-start; gap: 10px;
+            padding: 14px 16px 12px; background: #fafbfc;
+        }
+        .review-card.correct-card .review-card-header { background: #f0fdf4; }
+        .review-card.wrong-card   .review-card-header { background: #fff5f5; }
+        .review-card.skipped-card .review-card-header { background: #f8fafc; }
+        .review-q-num {
+            flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.78rem; font-weight: 700; background: var(--border); color: var(--text-light);
+        }
+        .review-card.correct-card .review-q-num { background: var(--success); color: #fff; }
+        .review-card.wrong-card   .review-q-num { background: var(--danger);  color: #fff; }
+        .review-card.skipped-card .review-q-num { background: var(--text-muted); color: #fff; }
+        .review-question { font-size: 0.92rem; font-weight: 600; color: var(--text); line-height: 1.5; flex: 1; }
+        .review-card-body { padding: 12px 16px 14px; display: flex; flex-direction: column; gap: 8px; }
+        .review-answer-row { display: flex; align-items: flex-start; gap: 8px; font-size: 0.85rem; }
+        .review-answer-label { font-weight: 700; white-space: nowrap; font-size: 0.78rem; padding: 3px 8px; border-radius: 6px; flex-shrink: 0; }
+        .label-your    { background: var(--danger-light);  color: var(--danger); }
+        .label-correct { background: var(--success-light); color: var(--success); }
+        .label-skipped { background: #f1f5f9; color: var(--text-muted); }
+        .review-answer-text { color: var(--text); line-height: 1.4; padding-top: 2px; }
+        .review-explanation {
+            margin-top: 4px; padding: 10px 14px;
+            background: var(--info-light); border-radius: var(--radius-sm);
+            border-left: 3px solid var(--info);
+            font-size: 0.83rem; color: #1e40af; line-height: 1.5;
+        }
+        .review-explanation strong { display: block; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 3px; color: var(--info); }
+        .review-footer { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 480px) {
+            .app-container { border-radius: var(--radius-lg); min-height: auto; }
+            .screen { padding: 20px 16px 18px; }
+            .start-screen, .name-screen { padding: 30px 16px; gap: 14px; }
+            .start-screen h1, .name-screen h2 { font-size: 1.4rem; }
+            .question-text { font-size: 1rem; padding: 12px 14px; }
+            .option-btn { padding: 12px 14px; font-size: 0.9rem; }
+            .option-letter { width: 30px; height: 30px; font-size: 0.8rem; }
+            .btn { padding: 12px 24px; font-size: 0.9rem; }
+            .btn-primary { padding: 14px 30px; font-size: 0.95rem; }
+            .review-list { padding: 12px 14px; }
+            .review-header { padding: 14px 14px 10px; }
+            .review-footer { padding: 12px 14px; }
+            .result-buttons .btn { font-size: 0.82rem; padding: 10px 16px; }
+        }
+    </style>
+</head>
+<body>
+<div class="app-container" id="appContainer">
+
+    <!-- ========== START SCREEN ========== -->
+    <div class="screen active" id="startScreen">
+        <!-- Guest content (new user) -->
+        <div class="guest-content" id="guestContent">
+            <div class="logo-icon">📖</div>
+            <h1>SSC Word Power Quiz</h1>
+            <p class="subtitle">Test your vocabulary skills with 50 frequently asked MCQs for SSC exams.</p>
+            <div class="info-cards">
+                <div class="info-card"><div class="icon">📋</div><div class="value">50</div><div class="label">Questions</div></div>
+                <div class="info-card"><div class="icon">⏱️</div><div class="value">1 min</div><div class="label">Per Question</div></div>
+                <div class="info-card"><div class="icon">🏆</div><div class="value">+1</div><div class="label">Per Correct</div></div>
+            </div>
+            <button class="btn btn-primary" id="btnStart">🚀 Start Quiz</button>
+        </div>
+
+        <!-- Returning user content (hidden by default) -->
+        <div class="returning-content" id="returningContent">
+            <div class="logo-icon">📖</div>
+            <div class="welcome-msg" id="welcomeMsg">Welcome back!</div>
+            <div class="history-box">
+                <h4>📊 Your Previous Scores</h4>
+                <div class="history-list" id="historyList">
+                    <p style="text-align:center; color:var(--text-muted);">Loading...</p>
+                </div>
+            </div>
+            <button class="btn btn-primary" id="btnStartReturning">🔄 Start New Quiz</button>
+            <button class="change-user-btn" id="btnChangeUser">Not you? Register as new user</button>
+        </div>
+    </div>
+
+    <!-- ========== NAME ENTRY SCREEN ========== -->
+    <div class="screen name-screen" id="nameScreen">
+        <div class="name-icon">👤</div>
+        <h2>What's Your Name?</h2>
+        <p>Enter your name and mobile number before starting. Both will be saved with your score.</p>
+        <div class="name-field-wrap">
+            <input type="text" class="name-field" id="playerNameInput"
+                   placeholder="Enter your name…" maxlength="30"
+                   autocomplete="off" autocorrect="off" spellcheck="false">
+            <span class="name-error" id="nameError"></span>
+
+            <input type="tel" class="mobile-field" id="mobileInput"
+                   placeholder="Enter your mobile number" maxlength="10"
+                   autocomplete="off" inputmode="numeric">
+            <span class="mobile-error" id="mobileError"></span>
+
+            <button class="btn btn-primary" id="btnBeginQuiz">▶️ Begin Quiz</button>
+            <button class="btn btn-outline btn-sm" id="btnBackToStart">← Back</button>
+        </div>
+    </div>
+
+    <!-- ========== QUIZ SCREEN ========== -->
+    <div class="screen" id="quizScreen">
+        <div class="quiz-header">
+            <span class="question-counter" id="questionCounter">Q 1/50</span>
+            <span class="player-badge" id="playerBadge">Player</span>
+            <span class="timer-display" id="timerDisplay">
+                <span class="timer-dot"></span>
+                <span id="timerText">60s</span>
+            </span>
+        </div>
+        <div class="timer-bar-container"><div class="timer-bar" id="timerBar"></div></div>
+        <div class="progress-dots" id="progressDots"></div>
+        <div class="question-text" id="questionText"></div>
+        <ul class="options-list" id="optionsList"></ul>
+    </div>
+
+    <!-- ========== RESULT SCREEN ========== -->
+    <div class="screen result-screen" id="resultScreen">
+        <div class="result-emoji" id="resultEmoji">🎉</div>
+        <div class="result-player-name" id="resultPlayerName">Player</div>
+        <div class="score-circle">
+            <svg viewBox="0 0 140 140">
+                <circle class="bg-ring" cx="70" cy="70" r="62"/>
+                <circle class="progress-ring" id="resultRing" cx="70" cy="70" r="62"
+                        stroke-dasharray="389.56" stroke-dashoffset="389.56"/>
+            </svg>
+            <div class="score-text">
+                <span id="resultScore">0</span>
+                <small>/ 50</small>
+            </div>
+        </div>
+        <p class="result-message" id="resultMessage"></p>
+        <p class="result-detail"  id="resultDetail"></p>
+        <div class="auto-save-status saving" id="autoSaveStatus">
+            <span id="autoSaveIcon">⏳</span>
+            <span id="autoSaveText">Saving your score…</span>
+        </div>
+        <div class="result-buttons">
+            <button class="btn btn-info btn-sm" id="btnReview">📖 Review Answers</button>
+            <button class="btn btn-primary btn-sm" id="btnRetry">🔄 Retry Quiz</button>
+        </div>
+    </div>
+
+    <!-- ========== REVIEW SCREEN ========== -->
+    <div class="screen review-screen" id="reviewScreen">
+        <div class="review-header">
+            <h2>📖 Answer Review</h2>
+            <span class="review-score-badge" id="reviewScoreBadge">0/50</span>
+        </div>
+        <div class="review-list" id="reviewList"></div>
+        <div class="review-footer">
+            <button class="btn btn-primary btn-sm" id="btnRetryFromReview">🔄 Retry Quiz</button>
+            <button class="btn btn-outline btn-sm" id="btnBackToResult">← Back to Result</button>
+        </div>
+    </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+
+    // =====================================================================
+    //  FIREBASE CONFIG – Replace with your own project
+    // =====================================================================
+    const firebaseConfig = {
+        apiKey:      "AIzaSyBFsiY4iOZ9-QKnZ_inrudYTAJ0F_Usht0",
+        authDomain:  "manoj-demo-4d34f.firebaseapp.com",
+        databaseURL: "https://manoj-demo-4d34f-default-rtdb.firebaseio.com",
+        projectId:   "manoj-demo-4d34f"
+    };
+    let db = null;
+    try {
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        db = firebase.database();
+        console.log('✅ Firebase initialized.');
+    } catch (err) {
+        console.warn('⚠️ Firebase init failed:', err.message);
+    }
+
+    // =====================================================================
+    //  DOM REFERENCES
+    // =====================================================================
+    const screens = {
+        start:   document.getElementById('startScreen'),
+        name:    document.getElementById('nameScreen'),
+        quiz:    document.getElementById('quizScreen'),
+        result:  document.getElementById('resultScreen'),
+        review:  document.getElementById('reviewScreen'),
+    };
+    const els = {
+        guestContent:          document.getElementById('guestContent'),
+        returningContent:      document.getElementById('returningContent'),
+        welcomeMsg:            document.getElementById('welcomeMsg'),
+        historyList:           document.getElementById('historyList'),
+        btnStart:              document.getElementById('btnStart'),
+        btnStartReturning:     document.getElementById('btnStartReturning'),
+        btnChangeUser:         document.getElementById('btnChangeUser'),
+        btnBeginQuiz:          document.getElementById('btnBeginQuiz'),
+        btnBackToStart:        document.getElementById('btnBackToStart'),
+        playerNameInput:       document.getElementById('playerNameInput'),
+        mobileInput:           document.getElementById('mobileInput'),
+        nameError:             document.getElementById('nameError'),
+        mobileError:           document.getElementById('mobileError'),
+        questionCounter:       document.getElementById('questionCounter'),
+        playerBadge:           document.getElementById('playerBadge'),
+        timerDisplay:          document.getElementById('timerDisplay'),
+        timerText:             document.getElementById('timerText'),
+        timerBar:              document.getElementById('timerBar'),
+        progressDots:          document.getElementById('progressDots'),
+        questionText:          document.getElementById('questionText'),
+        optionsList:           document.getElementById('optionsList'),
+        resultEmoji:           document.getElementById('resultEmoji'),
+        resultPlayerName:      document.getElementById('resultPlayerName'),
+        resultRing:            document.getElementById('resultRing'),
+        resultScore:           document.getElementById('resultScore'),
+        resultMessage:         document.getElementById('resultMessage'),
+        resultDetail:          document.getElementById('resultDetail'),
+        autoSaveStatus:        document.getElementById('autoSaveStatus'),
+        autoSaveIcon:          document.getElementById('autoSaveIcon'),
+        autoSaveText:          document.getElementById('autoSaveText'),
+        btnReview:             document.getElementById('btnReview'),
+        btnRetry:              document.getElementById('btnRetry'),
+        reviewList:            document.getElementById('reviewList'),
+        reviewScoreBadge:      document.getElementById('reviewScoreBadge'),
+        btnRetryFromReview:    document.getElementById('btnRetryFromReview'),
+        btnBackToResult:       document.getElementById('btnBackToResult'),
+        toast:                 document.getElementById('toast'),
+    };
+
+    // =====================================================================
+    //  CONSTANTS & STATE
+    // =====================================================================
+    const TOTAL_QUESTIONS    = 50;   // Changed to 50
+    const TIME_PER_QUESTION  = 60;   // 1 minute
+    const CIRCUMFERENCE      = 2 * Math.PI * 62;
+
+    let playerName   = '';
+    let playerMobile = '';
+    let isReturningUser = false;
+
+    let state = {
+        currentIndex:    0,
+        score:           0,
+        answers:         [],
+        timeLeft:        TIME_PER_QUESTION,
+        timerInterval:   null,
+        questionStartTime: 0,
+        quizFinished:    false,
+        totalTimeTaken:  0,
+        isAnswerLocked:  false,
+    };
+
+    // =====================================================================
+    //  50 WORD POWER QUESTIONS (Synonyms, Antonyms, One‑Word Substitutions, Idioms/Phrases, Spelling)
+    // =====================================================================
+    const questions = [
+        {
+            id: 1,
+            question: 'Synonym of "ABUNDANT" is:',
+            options: ['Scarce', 'Plentiful', 'Limited', 'Rare'],
+            correct: 1,
+            explanation: '"Abundant" means existing in large quantities. "Plentiful" is the correct synonym. "Scarce" and "Rare" are antonyms.'
+        },
+        {
+            id: 2,
+            question: 'Antonym of "BENEVOLENT" is:',
+            options: ['Kind', 'Charitable', 'Malevolent', 'Generous'],
+            correct: 2,
+            explanation: '"Benevolent" means well‑meaning and kindly. Its opposite is "Malevolent" (wishing evil).'
+        },
+        {
+            id: 3,
+            question: 'One‑word substitution: "A person who knows everything"',
+            options: ['Omnipotent', 'Omniscient', 'Omnipresent', 'Omnivorous'],
+            correct: 1,
+            explanation: '"Omniscient" means all‑knowing. Omnipotent = all‑powerful, Omnipresent = present everywhere.'
+        },
+        {
+            id: 4,
+            question: 'Meaning of the idiom: "To burn the midnight oil"',
+            options: ['To waste resources', 'To work late into the night', 'To set something on fire', 'To be very angry'],
+            correct: 1,
+            explanation: 'It means to study or work very hard until late at night, originating from working by oil lamp.'
+        },
+        {
+            id: 5,
+            question: 'Choose the correct spelling:',
+            options: ['Accomodate', 'Accommodate', 'Acommodate', 'Accommodate'],
+            correct: 1,
+            explanation: 'Correct spelling is A-C-C-O-M-M-O-D-A-T-E. Double "c" and double "m".'
+        },
+        {
+            id: 6,
+            question: 'Synonym of "CONCEAL" is:',
+            options: ['Reveal', 'Hide', 'Show', 'Display'],
+            correct: 1,
+            explanation: '"Conceal" means to keep something secret or hidden. "Hide" is its synonym.'
+        },
+        {
+            id: 7,
+            question: 'Antonym of "ELEVATE" is:',
+            options: ['Raise', 'Lift', 'Lower', 'Promote'],
+            correct: 2,
+            explanation: '"Elevate" means to raise or lift up. The opposite is "Lower".'
+        },
+        {
+            id: 8,
+            question: 'One‑word substitution: "A speech made without preparation"',
+            options: ['Extempore', 'Manuscript', 'Debate', 'Monologue'],
+            correct: 0,
+            explanation: '"Extempore" means spoken or done without preparation.'
+        },
+        {
+            id: 9,
+            question: 'Meaning of the phrase: "To cry over spilt milk"',
+            options: ['To be emotional about dairy', 'To complain about past losses', 'To celebrate a victory', 'To prepare for the future'],
+            correct: 1,
+            explanation: 'It means to waste time worrying about something that has already happened and cannot be changed.'
+        },
+        {
+            id: 10,
+            question: 'Which word is spelled correctly?',
+            options: ['Embarrass', 'Embarass', 'Embarras', 'Embaras'],
+            correct: 0,
+            explanation: 'Correct spelling: E-M-B-A-R-R-A-S-S (double "r", double "s").'
+        },
+        {
+            id: 11,
+            question: 'Synonym of "FRUGAL" is:',
+            options: ['Extravagant', 'Thrifty', 'Wasteful', 'Lavish'],
+            correct: 1,
+            explanation: '"Frugal" means sparing or economical with regard to money or food. "Thrifty" is its synonym.'
+        },
+        {
+            id: 12,
+            question: 'Antonym of "GREGARIOUS" is:',
+            options: ['Sociable', 'Friendly', 'Introverted', 'Outgoing'],
+            correct: 2,
+            explanation: '"Gregarious" means fond of company; sociable. The opposite is "Introverted" or solitary.'
+        },
+        {
+            id: 13,
+            question: 'One‑word substitution: "One who looks at the bright side of things"',
+            options: ['Pessimist', 'Optimist', 'Realist', 'Cynic'],
+            correct: 1,
+            explanation: '"Optimist" is a person who tends to be hopeful and confident about the future.'
+        },
+        {
+            id: 14,
+            question: 'Meaning of the idiom: "A blessing in disguise"',
+            options: ['A hidden curse', 'Something good that seemed bad at first', 'A religious gift', 'A visible benefit'],
+            correct: 1,
+            explanation: 'It refers to something that seems bad or unlucky at first but results in something good later.'
+        },
+        {
+            id: 15,
+            question: 'Choose the correctly spelled word:',
+            options: ['Maintainance', 'Maintenance', 'Maintinance', 'Maintenence'],
+            correct: 1,
+            explanation: 'Correct spelling: M-A-I-N-T-E-N-A-N-C-E.'
+        },
+        {
+            id: 16,
+            question: 'Synonym of "HOSTILE" is:',
+            options: ['Friendly', 'Aggressive', 'Peaceful', 'Calm'],
+            correct: 1,
+            explanation: '"Hostile" means unfriendly or antagonistic. "Aggressive" is a suitable synonym.'
+        },
+        {
+            id: 17,
+            question: 'Antonym of "IMPERATIVE" is:',
+            options: ['Essential', 'Optional', 'Urgent', 'Necessary'],
+            correct: 1,
+            explanation: '"Imperative" means of vital importance. Its antonym is "Optional" (not required).'
+        },
+        {
+            id: 18,
+            question: 'One‑word substitution: "A person who is indifferent to pain or pleasure"',
+            options: ['Stoic', 'Sensitive', 'Melancholic', 'Eccentric'],
+            correct: 0,
+            explanation: '"Stoic" describes someone who can endure pain or hardship without showing feelings or complaining.'
+        },
+        {
+            id: 19,
+            question: 'Meaning of the idiom: "To hit the nail on the head"',
+            options: ['To be clumsy', 'To do exactly the right thing', 'To miss the point', 'To hammer accurately'],
+            correct: 1,
+            explanation: 'It means to be exactly right about something or to find the exact answer.'
+        },
+        {
+            id: 20,
+            question: 'Correct spelling:',
+            options: ['Priviledge', 'Privilege', 'Privelege', 'Privilege'],
+            correct: 1,
+            explanation: 'Correct: P-R-I-V-I-L-E-G-E (no "d").'
+        },
+        {
+            id: 21,
+            question: 'Synonym of "JEOPARDY" is:',
+            options: ['Safety', 'Danger', 'Security', 'Protection'],
+            correct: 1,
+            explanation: '"Jeopardy" means danger of loss, harm, or failure. "Danger" is the closest synonym.'
+        },
+        {
+            id: 22,
+            question: 'Antonym of "KINDLE" is:',
+            options: ['Ignite', 'Extinguish', 'Arouse', 'Inflame'],
+            correct: 1,
+            explanation: '"Kindle" means to light or set on fire. The opposite is "Extinguish" (put out).'
+        },
+        {
+            id: 23,
+            question: 'One‑word substitution: "A government by the people"',
+            options: ['Autocracy', 'Democracy', 'Monarchy', 'Oligarchy'],
+            correct: 1,
+            explanation: '"Democracy" is a system of government by the whole population through elected representatives.'
+        },
+        {
+            id: 24,
+            question: 'Meaning of the phrase: "To keep one’s fingers crossed"',
+            options: ['To pray openly', 'To hope for good luck', 'To show disrespect', 'To make a promise'],
+            correct: 1,
+            explanation: 'It is a gesture used to wish for luck or to hope that things will happen in the desired way.'
+        },
+        {
+            id: 25,
+            question: 'Choose the correct spelling:',
+            options: ['Occurrence', 'Ocurrence', 'Occurence', 'Occurrence'],
+            correct: 0,
+            explanation: 'Correct: O-C-C-U-R-R-E-N-C-E (two "c", double "r", "e" before "n").'
+        },
+        {
+            id: 26,
+            question: 'Synonym of "LAMENT" is:',
+            options: ['Celebrate', 'Mourn', 'Rejoice', 'Praise'],
+            correct: 1,
+            explanation: '"Lament" means to express grief or sorrow. "Mourn" is the correct synonym.'
+        },
+        {
+            id: 27,
+            question: 'Antonym of "MUNDANE" is:',
+            options: ['Ordinary', 'Extraordinary', 'Routine', 'Common'],
+            correct: 1,
+            explanation: '"Mundane" means lacking interest or excitement; dull. Its antonym is "Extraordinary".'
+        },
+        {
+            id: 28,
+            question: 'One‑word substitution: "A person who speaks two languages"',
+            options: ['Monolingual', 'Bilingual', 'Polyglot', 'Linguist'],
+            correct: 1,
+            explanation: '"Bilingual" means able to speak two languages fluently.'
+        },
+        {
+            id: 29,
+            question: 'Meaning of the idiom: "Apple of discord"',
+            options: ['A sweet fruit', 'A source of dispute', 'A new invention', 'A peace offering'],
+            correct: 1,
+            explanation: 'It refers to a subject of dissension or conflict, originating from Greek mythology.'
+        },
+        {
+            id: 30,
+            question: 'Correct spelling:',
+            options: ['Exaggerate', 'Exagerate', 'Exaggarate', 'Exaggerate'],
+            correct: 0,
+            explanation: 'Correct spelling: E-X-A-G-G-E-R-A-T-E (double "g").'
+        },
+        {
+            id: 31,
+            question: 'Synonym of "NOTORIOUS" is:',
+            options: ['Famous', 'Infamous', 'Unknown', 'Popular'],
+            correct: 1,
+            explanation: '"Notorious" means famous for some bad quality or deed. "Infamous" is the correct synonym.'
+        },
+        {
+            id: 32,
+            question: 'Antonym of "OPAQUE" is:',
+            options: ['Transparent', 'Dark', 'Dull', 'Blurred'],
+            correct: 0,
+            explanation: '"Opaque" means not able to be seen through; not transparent. Its opposite is "Transparent".'
+        },
+        {
+            id: 33,
+            question: 'One‑word substitution: "One who is unable to pay his debts"',
+            options: ['Solvent', 'Insolvent', 'Debtor', 'Creditor'],
+            correct: 1,
+            explanation: '"Insolvent" means unable to pay debts owed.'
+        },
+        {
+            id: 34,
+            question: 'Meaning of the idiom: "To turn a deaf ear"',
+            options: ['To listen carefully', 'To ignore what someone says', 'To become deaf', 'To answer rudely'],
+            correct: 1,
+            explanation: 'It means to refuse to listen or respond to a statement or request.'
+        },
+        {
+            id: 35,
+            question: 'Choose the correctly spelled word:',
+            options: ['Conscience', 'Concience', 'Consience', 'Consciense'],
+            correct: 0,
+            explanation: 'Correct spelling: C-O-N-S-C-I-E-N-C-E.'
+        },
+        {
+            id: 36,
+            question: 'Synonym of "PROLIFIC" is:',
+            options: ['Unproductive', 'Fertile', 'Sterile', 'Meagre'],
+            correct: 1,
+            explanation: '"Prolific" means producing much fruit, foliage, or many offspring. "Fertile" is a synonym.'
+        },
+        {
+            id: 37,
+            question: 'Antonym of "QUENCH" is:',
+            options: ['Satisfy', 'Extinguish', 'Ignite', 'Dampen'],
+            correct: 2,
+            explanation: '"Quench" means to put out (a fire). The opposite is "Ignite" (to set fire).'
+        },
+        {
+            id: 38,
+            question: 'One‑word substitution: "A lover of books"',
+            options: ['Bibliophile', 'Biblicist', 'Librarian', 'Author'],
+            correct: 0,
+            explanation: '"Bibliophile" is a person who collects or has a great love of books.'
+        },
+        {
+            id: 39,
+            question: 'Meaning of the idiom: "To beat about the bush"',
+            options: ['To hunt properly', 'To avoid the main topic', 'To clean the garden', 'To speak directly'],
+            correct: 1,
+            explanation: 'It means to discuss a matter without coming to the point; to be evasive.'
+        },
+        {
+            id: 40,
+            question: 'Correct spelling:',
+            options: ['Milennium', 'Millennium', 'Millenium', 'Millennium'],
+            correct: 1,
+            explanation: 'Correct: M-I-L-L-E-N-N-I-U-M (double "l", double "n").'
+        },
+        {
+            id: 41,
+            question: 'Synonym of "RESILIENT" is:',
+            options: ['Fragile', 'Flexible', 'Rigid', 'Weak'],
+            correct: 1,
+            explanation: '"Resilient" means able to withstand or recover quickly. "Flexible" is a close synonym.'
+        },
+        {
+            id: 42,
+            question: 'Antonym of "SERENE" is:',
+            options: ['Calm', 'Peaceful', 'Turbulent', 'Quiet'],
+            correct: 2,
+            explanation: '"Serene" means calm and peaceful. Its opposite is "Turbulent" (chaotic and disturbed).'
+        },
+        {
+            id: 43,
+            question: 'One‑word substitution: "A place where bees are kept"',
+            options: ['Aviary', 'Apiary', 'Aquarium', 'Hutch'],
+            correct: 1,
+            explanation: '"Apiary" is a place where bees are kept; "Aviary" is for birds.'
+        },
+        {
+            id: 44,
+            question: 'Meaning of the phrase: "To spill the beans"',
+            options: ['To cook a meal', 'To reveal a secret', 'To drop food', 'To clean dishes'],
+            correct: 1,
+            explanation: 'It means to disclose secret information, often unintentionally.'
+        },
+        {
+            id: 45,
+            question: 'Choose the correct spelling:',
+            options: ['Definately', 'Definitely', 'Definitley', 'Definately'],
+            correct: 1,
+            explanation: 'Correct spelling: D-E-F-I-N-I-T-E-L-Y (no "a" after "n").'
+        },
+        {
+            id: 46,
+            question: 'Synonym of "TACITURN" is:',
+            options: ['Talkative', 'Reserved', 'Loquacious', 'Verbose'],
+            correct: 1,
+            explanation: '"Taciturn" means saying little. "Reserved" is a synonym; others mean talkative.'
+        },
+        {
+            id: 47,
+            question: 'Antonym of "UNANIMOUS" is:',
+            options: ['Divided', 'Agreed', 'United', 'Harmonious'],
+            correct: 0,
+            explanation: '"Unanimous" means fully in agreement. The opposite is "Divided" (not in agreement).'
+        },
+        {
+            id: 48,
+            question: 'One‑word substitution: "A person who walks in his/her sleep"',
+            options: ['Insomniac', 'Somnambulist', 'Narcissist', 'Misogynist'],
+            correct: 1,
+            explanation: '"Somnambulist" is a person who sleepwalks. Insomniac = person unable to sleep.'
+        },
+        {
+            id: 49,
+            question: 'Meaning of the idiom: "A hard nut to crack"',
+            options: ['A difficult problem', 'A tasty snack', 'A simple task', 'A foolish person'],
+            correct: 0,
+            explanation: 'It refers to a person or thing that is difficult to understand, solve, or deal with.'
+        },
+        {
+            id: 50,
+            question: 'Correct spelling:',
+            options: ['Separate', 'Seperate', 'Separete', 'Seperete'],
+            correct: 0,
+            explanation: 'Correct spelling: S-E-P-A-R-A-T-E (often mis‑spelt as "seperate").'
+        },
+    ];
+
+    // =====================================================================
+    //  SCREEN NAVIGATION
+    // =====================================================================
+    function showScreen(name) {
+        Object.values(screens).forEach(s => s.classList.remove('active'));
+        const t = screens[name];
+        if (!t) return;
+        t.style.animation = 'none';
+        t.offsetHeight;
+        t.style.animation = '';
+        t.classList.add('active');
+    }
+
+    // =====================================================================
+    //  TOAST
+    // =====================================================================
+    let toastTimer;
+    function showToast(msg, duration = 2500) {
+        clearTimeout(toastTimer);
+        els.toast.textContent = msg;
+        els.toast.classList.add('show');
+        toastTimer = setTimeout(() => els.toast.classList.remove('show'), duration);
+    }
+
+    // =====================================================================
+    //  QUIZ LOGIC (unchanged except total questions is 50)
+    // =====================================================================
+    function resetState() {
+        state.currentIndex    = 0;
+        state.score           = 0;
+        state.answers         = [];
+        state.timeLeft        = TIME_PER_QUESTION;
+        state.timerInterval   = null;
+        state.questionStartTime = 0;
+        state.quizFinished    = false;
+        state.totalTimeTaken  = 0;
+        state.isAnswerLocked  = false;
+    }
+
+    function buildProgressDots() {
+        els.progressDots.innerHTML = '';
+        for (let i = 0; i < TOTAL_QUESTIONS; i++) {
+            const dot = document.createElement('span');
+            dot.classList.add('progress-dot');
+            if (i < state.answers.length) {
+                const ans = state.answers[i];
+                if (ans.selectedIndex === -1) dot.classList.add('skipped');
+                else dot.classList.add(ans.isCorrect ? 'done' : 'wrong-dot');
+            } else if (i === state.currentIndex && !state.quizFinished) {
+                dot.classList.add('current');
+            }
+            dot.title = `Q${i + 1}`;
+            els.progressDots.appendChild(dot);
+        }
+    }
+
+    function loadQuestion() {
+        if (state.currentIndex >= TOTAL_QUESTIONS) { finishQuiz(); return; }
+        state.isAnswerLocked    = false;
+        state.timeLeft          = TIME_PER_QUESTION;
+        state.questionStartTime = Date.now();
+        const q = questions[state.currentIndex];
+
+        els.questionCounter.textContent = `Q ${state.currentIndex + 1}/${TOTAL_QUESTIONS}`;
+        els.questionText.textContent    = q.question;
+        els.optionsList.innerHTML       = '';
+
+        const letters = ['A', 'B', 'C', 'D'];
+        q.options.forEach((opt, idx) => {
+            const li  = document.createElement('li');
+            const btn = document.createElement('button');
+            btn.classList.add('option-btn');
+            btn.innerHTML = `<span class="option-letter">${letters[idx]}</span><span>${opt}</span>`;
+            btn.setAttribute('aria-label', `Option ${letters[idx]}: ${opt}`);
+            btn.addEventListener('click', () => handleOptionClick(idx, btn));
+            li.appendChild(btn);
+            els.optionsList.appendChild(li);
+        });
+
+        els.timerBar.classList.remove('warning', 'danger');
+        els.timerBar.style.width = '100%';
+        els.timerDisplay.classList.remove('warning', 'urgent');
+        els.timerText.textContent = `${TIME_PER_QUESTION}s`;
+        updateTimerDot(TIME_PER_QUESTION);
+        buildProgressDots();
+        startTimer();
+    }
+
+    function updateTimerDot(sec) {
+        const dot = els.timerDisplay.querySelector('.timer-dot');
+        dot.style.background = sec <= 10 ? '#ef4444' : sec <= 20 ? '#f59e0b' : '#10b981';
+    }
+
+    function startTimer() {
+        clearInterval(state.timerInterval);
+        state.timerInterval     = null;
+        state.timeLeft          = TIME_PER_QUESTION;
+        state.questionStartTime = Date.now();
+        els.timerBar.style.width = '100%';
+        els.timerBar.classList.remove('warning', 'danger');
+        els.timerDisplay.classList.remove('warning', 'urgent');
+        els.timerText.textContent = `${TIME_PER_QUESTION}s`;
+        updateTimerDot(TIME_PER_QUESTION);
+
+        state.timerInterval = setInterval(() => {
+            const elapsed   = (Date.now() - state.questionStartTime) / 1000;
+            const remaining = Math.max(0, TIME_PER_QUESTION - elapsed);
+            state.timeLeft  = remaining;
+            els.timerBar.style.width = `${(remaining / TIME_PER_QUESTION) * 100}%`;
+            els.timerText.textContent = `${Math.ceil(remaining)}s`;
+            updateTimerDot(Math.ceil(remaining));
+
+            els.timerBar.classList.remove('warning', 'danger');
+            els.timerDisplay.classList.remove('warning', 'urgent');
+            if      (remaining <= 10) { els.timerBar.classList.add('danger');  els.timerDisplay.classList.add('urgent');  }
+            else if (remaining <= 20) { els.timerBar.classList.add('warning'); els.timerDisplay.classList.add('warning'); }
+
+            if (remaining <= 0) handleTimeout();
+        }, 100);
+    }
+
+    function stopTimer() {
+        clearInterval(state.timerInterval);
+        state.timerInterval = null;
+    }
+
+    function handleTimeout() {
+        if (state.isAnswerLocked) return;
+        state.isAnswerLocked = true;
+        stopTimer();
+        const q    = questions[state.currentIndex];
+        const btns = els.optionsList.querySelectorAll('.option-btn');
+        btns.forEach(b => b.classList.add('disabled'));
+        btns[q.correct].classList.add('reveal-correct');
+        state.answers.push({ selectedIndex: -1, correctIndex: q.correct, isCorrect: false });
+        state.totalTimeTaken += TIME_PER_QUESTION;
+        buildProgressDots();
+        setTimeout(advanceQuestion, 900);
+    }
+
+    function handleOptionClick(selectedIndex, clickedBtn) {
+        if (state.isAnswerLocked) return;
+        state.isAnswerLocked = true;
+        stopTimer();
+
+        const q         = questions[state.currentIndex];
+        const isCorrect = selectedIndex === q.correct;
+        const btns      = els.optionsList.querySelectorAll('.option-btn');
+        const elapsed   = (Date.now() - state.questionStartTime) / 1000;
+        state.totalTimeTaken += Math.min(elapsed, TIME_PER_QUESTION);
+
+        btns.forEach(b => b.classList.add('disabled'));
+        btns[q.correct].classList.add('correct');
+        if (isCorrect) {
+            state.score++;
+            clickedBtn.classList.add('correct');
+        } else {
+            clickedBtn.classList.add('wrong');
+            btns[q.correct].classList.add('reveal-correct');
+        }
+
+        state.answers.push({ selectedIndex, correctIndex: q.correct, isCorrect });
+        buildProgressDots();
+        setTimeout(advanceQuestion, isCorrect ? 700 : 1000);
+    }
+
+    function advanceQuestion() {
+        state.currentIndex++;
+        if (state.currentIndex >= TOTAL_QUESTIONS) finishQuiz();
+        else loadQuestion();
+    }
+
+    function finishQuiz() {
+        stopTimer();
+        state.quizFinished = true;
+        buildProgressDots();
+        showResults();
+        autoSaveScore();
+    }
+
+    // =====================================================================
+    //  RESULTS
+    // =====================================================================
+    function showResults() {
+        showScreen('result');
+        const percentage = Math.round((state.score / TOTAL_QUESTIONS) * 100);
+        const offset     = CIRCUMFERENCE - (percentage / 100) * CIRCUMFERENCE;
+
+        els.resultPlayerName.textContent = `👤 ${playerName} (${playerMobile})`;
+        els.resultRing.style.strokeDasharray  = CIRCUMFERENCE;
+        els.resultRing.style.strokeDashoffset = CIRCUMFERENCE;
+
+        let ringColor = '#ef4444';
+        if      (percentage >= 80) ringColor = '#10b981';
+        else if (percentage >= 60) ringColor = '#f59e0b';
+        else if (percentage >= 40) ringColor = '#f97316';
+        els.resultRing.style.stroke = ringColor;
+
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            els.resultRing.style.strokeDashoffset = offset;
+        }));
+        animateCount(els.resultScore, 0, state.score, 1000);
+
+        let emoji, message;
+        if      (percentage >= 90) { emoji = '🏆'; message = "Outstanding! You're a vocabulary master!"; }
+        else if (percentage >= 75) { emoji = '🌟'; message = 'Excellent work! Keep building your word power.'; }
+        else if (percentage >= 60) { emoji = '👍'; message = 'Good job! Consistent practice will help.'; }
+        else if (percentage >= 40) { emoji = '📚'; message = 'Fair attempt. More word lists and revision needed.'; }
+        else                       { emoji = '💪'; message = 'Keep learning! Word power builds with daily practice.'; }
+
+        els.resultEmoji.textContent   = emoji;
+        els.resultMessage.textContent = message;
+        els.resultDetail.textContent  = `You scored ${state.score} out of ${TOTAL_QUESTIONS} (${percentage}%) in ${formatTime(state.totalTimeTaken)}.`;
+
+        setAutoSaveStatus('saving', '⏳', 'Saving your score…');
+    }
+
+    function setAutoSaveStatus(type, icon, text) {
+        els.autoSaveStatus.className = `auto-save-status ${type}`;
+        els.autoSaveIcon.textContent = icon;
+        els.autoSaveText.textContent = text;
+    }
+
+    // =====================================================================
+    //  AUTO‑SAVE
+    // =====================================================================
+    async function autoSaveScore() {
+        if (!db) {
+            setAutoSaveStatus('error', '⚠️', 'Firebase not available. Score not saved.');
+            return;
+        }
+        const percentage = Math.round((state.score / TOTAL_QUESTIONS) * 100);
+        const data = {
+            name:      playerName,
+            mobile:    playerMobile,
+            score:     state.score,
+            total:     TOTAL_QUESTIONS,
+            percentage,
+            timeTaken: Math.round(state.totalTimeTaken),
+            timestamp: new Date().toISOString(),
+        };
+        try {
+            await db.ref('quizResults').push(data);
+            setAutoSaveStatus('saved', '✅', `Score saved for "${playerName}"!`);
+        } catch (err) {
+            console.error('Auto-save error:', err);
+            if (err.message && err.message.includes('PERMISSION_DENIED')) {
+                setAutoSaveStatus('error', '⚠️', 'Save failed: Update Firebase rules.');
+            } else if (!navigator.onLine) {
+                setAutoSaveStatus('error', '📵', 'No internet. Score not saved.');
+            } else {
+                setAutoSaveStatus('error', '⚠️', 'Save failed. Check Firebase connection.');
+            }
+        }
+    }
+
+    // =====================================================================
+    //  REVIEW SCREEN
+    // =====================================================================
+    function buildReview() {
+        els.reviewScoreBadge.textContent = `${state.score}/${TOTAL_QUESTIONS}`;
+        els.reviewList.innerHTML = '';
+
+        const letters = ['A', 'B', 'C', 'D'];
+
+        questions.forEach((q, i) => {
+            const ans         = state.answers[i];
+            const isCorrect   = ans && ans.isCorrect;
+            const isSkipped   = ans && ans.selectedIndex === -1;
+            const cardClass   = isCorrect ? 'correct-card' : isSkipped ? 'skipped-card' : 'wrong-card';
+
+            const card = document.createElement('div');
+            card.classList.add('review-card', cardClass);
+
+            const hdr = document.createElement('div');
+            hdr.classList.add('review-card-header');
+            hdr.innerHTML = `
+                <span class="review-q-num">${i + 1}</span>
+                <span class="review-question">${escapeHTML(q.question)}</span>
+            `;
+            card.appendChild(hdr);
+
+            const body = document.createElement('div');
+            body.classList.add('review-card-body');
+
+            if (isSkipped) {
+                body.innerHTML += `
+                    <div class="review-answer-row">
+                        <span class="review-answer-label label-skipped">⏰ Time Up</span>
+                        <span class="review-answer-text" style="color:var(--text-muted);">You did not answer this question.</span>
+                    </div>`;
+            } else if (!isCorrect) {
+                body.innerHTML += `
+                    <div class="review-answer-row">
+                        <span class="review-answer-label label-your">✗ Your Ans</span>
+                        <span class="review-answer-text">${escapeHTML(letters[ans.selectedIndex] + '. ' + q.options[ans.selectedIndex])}</span>
+                    </div>`;
+            }
+
+            body.innerHTML += `
+                <div class="review-answer-row">
+                    <span class="review-answer-label label-correct">✓ Correct</span>
+                    <span class="review-answer-text">${escapeHTML(letters[q.correct] + '. ' + q.options[q.correct])}</span>
+                </div>`;
+
+            body.innerHTML += `
+                <div class="review-explanation">
+                    <strong>💡 Explanation</strong>
+                    ${escapeHTML(q.explanation)}
+                </div>`;
+
+            card.appendChild(body);
+            els.reviewList.appendChild(card);
+        });
+
+        els.reviewList.scrollTop = 0;
+    }
+
+    // =====================================================================
+    //  HELPERS
+    // =====================================================================
+    function animateCount(el, start, end, duration) {
+        const t0 = performance.now();
+        (function update(now) {
+            const p = Math.min((now - t0) / duration, 1);
+            const e = 1 - Math.pow(1 - p, 3);
+            el.textContent = Math.round(start + (end - start) * e);
+            if (p < 1) requestAnimationFrame(update);
+            else el.textContent = end;
+        })(t0);
+    }
+
+    function formatTime(totalSec) {
+        const m = Math.floor(totalSec / 60), s = Math.floor(totalSec % 60);
+        return m > 0 ? `${m}m ${s}s` : `${s}s`;
+    }
+
+    function escapeHTML(str) {
+        const d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    function startQuiz() {
+        resetState();
+        els.playerBadge.textContent = `👤 ${playerName}`;
+        showScreen('quiz');
+        loadQuestion();
+    }
+
+    // =====================================================================
+    //  REGISTRATION / RETURNING USER LOGIC (unchanged)
+    // =====================================================================
+    async function saveUserToFirebase(name, mobile) {
+        if (!db) return;
+        try {
+            await db.ref('login/' + mobile).set({
+                name: name,
+                mobile: mobile,
+                registeredAt: new Date().toISOString()
+            });
+        } catch (err) {
+            console.error('Firebase save error:', err);
+        }
+    }
+
+    async function getExistingUser(mobile) {
+        if (!db) return null;
+        try {
+            const snap = await db.ref('login/' + mobile).once('value');
+            const data = snap.val();
+            return data && data.name ? data.name : null;
+        } catch {
+            return null;
+        }
+    }
+
+    async function loadHistory(mobile) {
+        els.historyList.innerHTML = '<p style="text-align:center; color:var(--text-muted);">Loading...</p>';
+        if (!db) {
+            els.historyList.innerHTML = '<p style="text-align:center; color:var(--text-muted);">Firebase unavailable</p>';
+            return;
+        }
+        try {
+            const snap = await db.ref('quizResults')
+                .orderByChild('mobile')
+                .equalTo(mobile)
+                .limitToLast(5)
+                .once('value');
+            const results = snap.val();
+            if (!results) {
+                els.historyList.innerHTML = '<p style="text-align:center; color:var(--text-muted);">No previous scores</p>';
+                return;
+            }
+            const sorted = Object.values(results).sort((a,b) => (b.timestamp||'').localeCompare(a.timestamp||''));
+            els.historyList.innerHTML = '';
+            sorted.forEach(entry => {
+                const item = document.createElement('div');
+                item.className = 'history-item';
+                const score = `${entry.score}/${entry.total} (${entry.percentage}%)`;
+                const date = entry.timestamp ? new Date(entry.timestamp).toLocaleDateString() : 'N/A';
+                item.innerHTML = `<span>${escapeHTML(entry.name)}</span>
+                                 <span class="history-score">${score}</span>
+                                 <span class="history-date">${date}</span>`;
+                els.historyList.appendChild(item);
+            });
+        } catch (err) {
+            els.historyList.innerHTML = '<p style="text-align:center; color:var(--text-muted);">Could not load history</p>';
+        }
+    }
+
+    function showReturningUI(name, mobile) {
+        isReturningUser = true;
+        playerName = name;
+        playerMobile = mobile;
+        els.guestContent.style.display = 'none';
+        els.returningContent.style.display = 'flex';
+        els.welcomeMsg.textContent = `Welcome back, ${name}!`;
+        loadHistory(mobile);
+        showScreen('start');
+    }
+
+    function showGuestUI() {
+        isReturningUser = false;
+        playerName = '';
+        playerMobile = '';
+        els.guestContent.style.display = 'flex';
+        els.returningContent.style.display = 'none';
+        showScreen('start');
+    }
+
+    async function initUserSession() {
+        const storedMobile = localStorage.getItem('quizUser');
+        if (!storedMobile) {
+            showGuestUI();
+            return;
+        }
+        if (db) {
+            const name = await getExistingUser(storedMobile);
+            if (name) {
+                showReturningUI(name, storedMobile);
+                return;
+            } else {
+                localStorage.removeItem('quizUser');
+            }
+        } else {
+            localStorage.removeItem('quizUser');
+        }
+        showGuestUI();
+    }
+
+    // =====================================================================
+    //  EVENT LISTENERS
+    // =====================================================================
+    els.btnStart.addEventListener('click', () => {
+        els.playerNameInput.value = localStorage.getItem('quizPlayerName') || '';
+        els.mobileInput.value = '';
+        els.nameError.textContent = '';
+        els.mobileError.textContent = '';
+        showScreen('name');
+        setTimeout(() => els.playerNameInput.focus(), 300);
+    });
+
+    els.btnStartReturning.addEventListener('click', () => {
+        if (!playerName || !playerMobile) {
+            showToast('⚠️ Session error, please register again');
+            showGuestUI();
+            return;
+        }
+        startQuiz();
+    });
+
+    els.btnChangeUser.addEventListener('click', () => {
+        localStorage.removeItem('quizUser');
+        localStorage.removeItem('quizPlayerName');
+        playerName = '';
+        playerMobile = '';
+        showGuestUI();
+        showToast('👋 You are now a new user. Please enter your details.');
+    });
+
+    els.btnBackToStart.addEventListener('click', () => {
+        if (isReturningUser) showReturningUI(playerName, playerMobile);
+        else showGuestUI();
+    });
+
+    els.playerNameInput.addEventListener('keydown', e => { if (e.key === 'Enter') els.mobileInput.focus(); });
+    els.mobileInput.addEventListener('keydown', e => { if (e.key === 'Enter') els.btnBeginQuiz.click(); });
+
+    els.btnBeginQuiz.addEventListener('click', async () => {
+        const rawName = els.playerNameInput.value.trim();
+        if (!rawName) {
+            els.nameError.textContent = '⚠️ Please enter your name.';
+            els.playerNameInput.focus();
+            return;
+        }
+        if (rawName.length < 2) {
+            els.nameError.textContent = '⚠️ Name must be at least 2 characters.';
+            els.playerNameInput.focus();
+            return;
+        }
+        els.nameError.textContent = '';
+
+        const rawMobile = els.mobileInput.value.trim();
+        if (!rawMobile) {
+            els.mobileError.textContent = '⚠️ Please enter your mobile number.';
+            els.mobileInput.focus();
+            return;
+        }
+        if (!/^\d{10}$/.test(rawMobile)) {
+            els.mobileError.textContent = '⚠️ Mobile number must be exactly 10 digits.';
+            els.mobileInput.focus();
+            return;
+        }
+        els.mobileError.textContent = '';
+
+        if (db) {
+            const existingName = await getExistingUser(rawMobile);
+            if (existingName) {
+                showToast(`Mobile already registered as "${existingName}". Using that name.`);
+                playerName = existingName;
+                playerMobile = rawMobile;
+                localStorage.setItem('quizUser', rawMobile);
+                localStorage.setItem('quizPlayerName', existingName);
+                startQuiz();
+                return;
+            }
+        }
+
+        playerName = rawName;
+        playerMobile = rawMobile;
+        localStorage.setItem('quizUser', rawMobile);
+        localStorage.setItem('quizPlayerName', rawName);
+        if (db) await saveUserToFirebase(rawName, rawMobile);
+        startQuiz();
+    });
+
+    els.btnReview.addEventListener('click', () => {
+        buildReview();
+        showScreen('review');
+    });
+
+    els.btnBackToResult.addEventListener('click', () => showScreen('result'));
+
+    els.btnRetry.addEventListener('click', () => {
+        startQuiz();
+    });
+
+    els.btnRetryFromReview.addEventListener('click', () => {
+        startQuiz();
+    });
+
+    // =====================================================================
+    //  FINAL INIT
+    // =====================================================================
+    function init() {
+        els.resultRing.style.strokeDasharray  = CIRCUMFERENCE;
+        els.resultRing.style.strokeDashoffset = CIRCUMFERENCE;
+        els.resultScore.textContent = '0';
+        initUserSession();
+    }
+
+    init();
+})();
+</script>
+</body>
+</html>
